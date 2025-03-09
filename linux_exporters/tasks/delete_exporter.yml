@@ -1,0 +1,32 @@
+- name: Stop and disable {{ exporter_name }} service
+  systemd:
+    name: "{{ exporter_name }}"
+    state: stopped
+    enabled: false
+    scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+  become: "{{ exporter_rootfull }}"
+  ignore_errors: true
+
+- name: Remove {{ exporter_name }} systemd service file
+  file:
+    path: "{{ '/etc/systemd/system/' if exporter_rootfull else '/home/' ~ ansible_user ~ '/.config/systemd/user/' }}{{ exporter_name }}.service"
+    state: absent
+  become: "{{ exporter_rootfull }}"
+  ignore_errors: true
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: true
+    scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+  environment:
+    XDG_RUNTIME_DIR: "{{ '/run/user/' ~ user_info.ansible_facts.getent_passwd[ansible_user][1] if not exporter_rootfull else omit }}"
+  become: "{{ exporter_rootfull }}"
+
+- name: Check status of {{ exporter_name }} service
+  systemd:
+    name: "{{ exporter_name }}"
+    state: started
+    scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+  register: service_status
+  become: "{{ exporter_rootfull }}"
+  ignore_errors: true

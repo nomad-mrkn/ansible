@@ -1,0 +1,127 @@
+- name: Check services
+  block:
+    - name: Check if {{ exporter_name }} service is running
+      systemd:
+        name: "{{ exporter_name }}"
+        scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+        state: started
+      register: exporter_service_status
+      ignore_errors: true
+
+    - name: Stop execution if exporter is already running
+      meta: end_play
+      when:
+        - not exporter_service_status.failed
+        - "'ActiveState' in exporter_service_status.status"
+        - exporter_service_status.status.ActiveState == "active"
+
+    - name: Check Docker service state
+      systemd:
+        name: "{{ 'docker' if exporter_rootfull else 'docker.service' }}"
+        scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+        state: started
+      register: docker_service
+      ignore_errors: true
+      when: exporter_use_container
+
+    - name: Stop execution if Docker is not running
+      meta: end_play
+      when:
+        - exporter_use_container
+        - docker_service.failed or docker_service.status.ActiveState != "active"
+  become: "{{ exporter_rootfull }}"
+  when: exporter_install
+
+- name: Create {{ exporter_user }} user (for rootfull exporter)
+  user:
+    name: "{{ exporter_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+  when: not exporter_use_container and exporter_rootfull
+
+- name: Get user information
+  become: "{{ exporter_rootfull }}"
+  getent:
+    database: passwd
+    key: "{{ ansible_user }}"
+  register: user_info
+  when: not exporter_rootfull
+
+- name: Ensure systemd user directory exists (rootless only)
+  become: "{{ exporter_rootfull }}"
+  file:
+    path: "/home/{{ ansible_user }}/.config/systemd/user"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  when: not exporter_rootfull
+
+- name: Pull Docker image for {{ exporter_name }}
+  docker_image:
+    name: "{{ exporter_image }}"
+    source: pull
+  environment: >-
+    {{
+      {'DOCKER_HOST': 'unix:///run/user/' ~ user_info.ansible_facts.getent_passwd[ansible_user][1] ~ '/docker.sock'}
+      if not exporter_rootfull else {}
+    }}
+  when: exporter_use_container and docker_service is success
+
+- name: Download and install {{ exporter_name }} binary (non-containerized)
+  block:
+    - name: Download {{ exporter_name }}
+      get_url:
+        url: "{{ exporter_download_link }}"
+        dest: "{{ exporter_archive_dir }}"
+        mode: '0755'
+
+    - name: Extract {{ exporter_name }}
+      unarchive:
+        src: "{{ exporter_archive_dir }}"
+        dest: "/tmp/"
+        remote_src: yes
+
+    - name: Move and set permissions for {{ exporter_name }}
+      command: "mv {{ exporter_dir }}/{{ exporter_name }} /usr/local/bin/"
+      args:
+        creates: "{{ exporter_bin_dir }}/{{ exporter_name }}"
+
+    - name: Set ownership and permissions
+      file:
+        path: "{{ exporter_bin_dir }}/{{ exporter_name }}"
+        owner: "{{ exporter_user if exporter_rootfull else ansible_user }}"
+        group: "{{ exporter_user if exporter_rootfull else ansible_user }}"
+        mode: '0755'
+  when: not exporter_use_container
+
+- name: Deploy systemd service file for {{ exporter_name }}
+  template:
+    src: exporter_service.j2
+    dest: "{{ '/etc/systemd/system/' if exporter_rootfull else '/home/' ~ ansible_user ~ '/.config/systemd/user/' }}{{ exporter_service }}.service"
+    mode: "0644"
+    owner: "{{ 'root' if exporter_rootfull else ansible_user }}"
+    group: "{{ 'root' if exporter_rootfull else ansible_user }}"
+  notify: Restart {{ exporter_service }}
+
+- name: Reload systemd and start exporter
+  block:
+    - name: Reload systemd daemon
+      become: "{{ exporter_rootfull }}"
+      systemd:
+        daemon_reload: yes
+        scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+
+    - name: Start and enable {{ exporter_name }} service
+      systemd:
+        name: "{{ exporter_service }}"
+        state: started
+        enabled: yes
+        scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+      environment:
+        XDG_RUNTIME_DIR: "{{ '/run/user/' ~ user_info.ansible_facts.getent_passwd[ansible_user][1] if not exporter_rootfull else omit }}"
+      become: "{{ exporter_rootfull }}"
+      register: started
+      retries: 5
+      delay: 15
+      until: started is succeeded

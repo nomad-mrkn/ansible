@@ -1,0 +1,87 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description={{ exporter_name }} service
+After=network.target
+{% if exporter_use_container %}
+Requires=docker.service
+After=docker.service
+{% endif %}
+StartLimitIntervalSec={{ exporter_start_limit_interval }}
+StartLimitBurst={{ exporter_start_limit_burst }}
+
+[Service]
+{% if exporter_use_container %}
+ExecStartPre=-/usr/bin/docker rm --force {{ exporter_container_name }}
+ExecStart={% if exporter_rootfull %}/usr/bin/docker{% else %}/usr/bin/env DOCKER_HOST=unix:///run/user/{{ user_info.ansible_facts.getent_passwd[ansible_user][1] }}/docker.sock /home/{{ ansible_user }}/bin/docker{% endif %} run \
+    --name={{ exporter_container_name }} \
+    --rm=true \
+    --read-only \
+{% if exporter_privileged %}
+    --privileged \
+{% endif %}
+{% for tmp in exporter_tmpfs %}
+    --tmpfs {{ tmp }} \
+{% endfor %}
+{% if exporter_internal_user %}
+    -u {{ exporter_internal_user }} \
+{% endif %}
+{% for mount in exporter_mounts %}
+    -v {{ mount }} \
+{% endfor %}
+{% if not exporter_rootfull %}
+    {% for mount in exporter_mounts_rootless %}
+    -v {{ mount }} \
+    {% endfor %}
+{% endif %}
+{% if exporter_pid_mode == 'host' %}
+    --pid=host \
+{% endif %}
+{% set port_parts = exporter_port | string | split(':') %}
+{% if port_parts | length == 3 %}
+    -p {{ port_parts[0] }}:{{ port_parts[1] }}:{{ port_parts[2] }} \
+{% elif port_parts | length == 2 %}
+    -p {{ port_parts[0] }}:{{ port_parts[1] }} \
+{% elif port_parts | length == 1 %}
+    -p {{ port_parts[0] }}:{{ port_parts[0] }} \
+{% endif %}
+{% for key, value in exporter_env.items() %}
+    -e {{ key }}="{{ value }}" \
+{% endfor %}
+    --stop-timeout={{ exporter_stop_timeout }} \
+    {{ exporter_image }} \
+{% if exporter_container_cmd is iterable and exporter_container_cmd is not string %}
+    {{ exporter_container_cmd | join(" ") }} \
+{% else %}
+    {{ exporter_container_cmd }} \
+{% endif %}
+{% if exporter_cmd is iterable and exporter_cmd is not string %}
+    {{ exporter_cmd | join(" ") }}
+{% else %}
+    {{ exporter_cmd }}
+{% endif %}
+
+ExecStop=-/usr/bin/docker stop {{ exporter_container_name }}
+
+{% else %}
+Type=simple
+ExecStart=/usr/local/bin/{{ exporter_name }} \
+{% if exporter_cmd is iterable and exporter_cmd is not string %}
+    {{ exporter_cmd | join(" ") }}
+{% else %}
+    {{ exporter_cmd }}
+{% endif %}
+
+{% if exporter_rootfull %}
+User={{ exporter_user }}
+Group={{ exporter_user }}
+{% endif %}
+
+{% endif %}
+Restart=always
+RestartSec=10
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

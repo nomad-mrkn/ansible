@@ -1,0 +1,32 @@
+exporter_name: {}
+exporter_container_name: "{{ exporter_name }}"
+exporter_user: "{{ exporter_name }}"
+exporter_service: "{{ exporter_name }}"
+exporter_bin_dir: "/usr/local/bin"
+exporter_temp_dir: "/tmp"
+
+exporter_download_link: "https://github.com/prometheus/{{ exporter_name }}/releases/download/v{{ exporter_version }}/{{ exporter_archive_name }}"
+exporter_archive_name: "{{ exporter_name }}-{{ exporter_version }}.linux-amd64.tar.gz"
+exporter_archive_dir: "{{ exporter_temp_dir }}/{{ exporter_archive_name }}"
+exporter_files_dir: "{{ exporter_name }}-{{ exporter_version }}.linux-amd64"
+exporter_dir: "{{ exporter_temp_dir }}/{{ exporter_files_dir }}"
+
+exporter_install: {}
+exporter_version: {}
+exporter_image: {}
+exporter_port: {}
+exporter_internal_user: {}
+exporter_mounts: {}
+exporter_mounts_rootless: {}
+exporter_env: {}
+exporter_pid_mode: {}
+exporter_network: {}
+exporter_privileged: {}
+exporter_cmd: {}
+exporter_container_cmd: {}
+exporter_tmpfs:
+  - "/run"
+  - "/tmp"
+exporter_stop_timeout: "30"
+exporter_start_limit_interval: "60"
+exporter_start_limit_burst: "5"

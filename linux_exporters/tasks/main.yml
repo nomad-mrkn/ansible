@@ -1,0 +1,11 @@
+- name: install_exporter
+  import_tasks: install_exporter.yml
+  tags:
+    - install_exporter
+  when: "'install_exporter' in ansible_run_tags"
+
+- name: delete_exporter
+  import_tasks: delete_exporter.yml
+  tags :
+    - delete_exporter
+  when: "'delete_exporter' in ansible_run_tags"

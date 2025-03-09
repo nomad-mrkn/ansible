@@ -1,0 +1,14 @@
+- name: Restart {{ exporter_service }}
+  systemd:
+    daemon_reload: true
+    name: "{{ exporter_service }}"
+    state: restarted
+    scope: "{{ 'system' if exporter_rootfull else 'user' }}"
+  environment:
+    XDG_RUNTIME_DIR: "{{ '/run/user/' ~ user_info.ansible_facts.getent_passwd[ansible_user][1] if not exporter_rootfull else omit }}"
+  become: "{{ exporter_rootfull }}"
+  when: not ansible_check_mode
+  register: restart_handler
+  retries: 5
+  delay: 15
+  until: restart_handler is succeeded
