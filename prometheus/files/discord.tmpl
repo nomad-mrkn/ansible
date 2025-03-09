@@ -1,0 +1,33 @@
+{{- define "discord.silence.url" -}}
+{{- if eq .Status "firing" -}}
+[Silence]({{ .ExternalURL }}#/silences/new?filter={
+    {{- range .CommonLabels.SortedPairs -}}
+        {{- if ne .Name "instance" -}}
+            {{- .Name }}%3D"{{- .Value | reReplaceAll " " "%20" -}}"%2C%20
+        {{- end -}}
+    {{- end -}}
+    instance%3D"{{ .CommonLabels.instance }}"})
+{{- end -}}
+{{- end }}
+
+{{- define "discord.incident.url" -}}
+  https://# your sheet incident
+{{- end }}
+
+{{- define "discord.default.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:fire:{{ end }}{{ if eq .Status "resolved" }}:white_check_mark:{{ end }} {{ .CommonLabels.instance }}]
+{{- end }}
+
+{{- define "discord.default.text" }}
+[Alertmanager]({{ .ExternalURL }}/#/alerts?receiver={{ .Receiver | urlquery }}), [Incident]({{ template "discord.incident.url" }}), {{ template "discord.silence.url" . }}
+{{- range .Alerts }}
+{{- if eq .Status "firing" }}
+• **{{ .Labels.severity }}** {{ .Annotations.description }} {{ if .Labels.repeat }}(repeat:{{ .Labels.repeat }}){{ end }}
+{{- end }}
+{{- end }}
+{{- range .Alerts }}
+{{- if eq .Status "resolved" }}
+• {{ if eq $.Status "firing" }}~~{{ end }}**{{ .Labels.severity }}** {{ .Annotations.description }} {{ if .Labels.repeat }}(repeat:{{ .Labels.repeat }}){{ end }}
+{{- end }}
+{{- end }}
+{{- end }}

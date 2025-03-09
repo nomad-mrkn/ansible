@@ -1,0 +1,14 @@
+- name: prometheus_install
+  import_tasks: prometheus_install.yml
+  tags :
+    - prometheus_install
+
+- name: alertmanager_install
+  import_tasks: alertmanager_install.yml
+  tags :
+    - alertmanager_install
+
+- name: blackbox_install
+  import_tasks: blackbox_install.yml
+  tags:
+    - blackbox_install

@@ -1,0 +1,44 @@
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ ansible_dir }}", owner: "root", group: "root", mode: "755" }
+    - { path: "{{ alertmanager_dir }}", owner: "root", group: "root", mode: "755" }
+
+- name: create config files
+  template:
+    src: templates/alertmanager.j2
+    dest: "{{ alertmanager_dir }}/alertmanager.yml"
+    owner: root
+    group: root
+    mode: 644
+  register: config_status
+
+- name: Copy template
+  copy:
+    src: files/telegram.tmpl
+    dest: "{{ alertmanager_dir }}/telegram.tmpl"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: run alertmanager container
+  docker_container:
+    name: "{{ alertmanager_container_name }}"
+    image: "{{ alertmanager_container_image }}"
+    ports: "{{ alertmanager_container_ports }}"
+    state: started
+    memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    networks:
+      - name: "{{monitoring_network_name}}"
+        ipv4_address: "{{alertmanager_container_ip}}"
+    restart_policy: always
+    volumes:
+      - "{{ alertmanager_dir }}/alertmanager.yml:/etc/alertmanager/alertmanager.yml"
+      - "{{ alertmanager_dir }}/telegram.tmpl:/etc/alertmanager/telegram.tmpl"
+    command: "--config.file=/etc/alertmanager/alertmanager.yml --web.external-url={{alertmanager_url}}"
+    restart: "{{ config_status.changed }}"

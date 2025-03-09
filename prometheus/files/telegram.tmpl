@@ -1,0 +1,57 @@
+ansible_managed
+
+{{- define "telegram.dev" -}}
+{{ if eq .Status "firing" -}}
+🔔 DEV ALERT 🔔
+
+{{ else -}}
+✅ Resolved ✅
+
+{{ end -}}
+Alert: {{ .CommonLabels.alertname }}
+Host: {{ .CommonLabels.instance }}
+{{ range .Alerts -}}
+Details: {{ .Annotations.description }}
+{{ end }}
+{{- end }}
+
+
+{{- define "telegram.warning" -}}
+{{ if eq .Status "firing" -}}
+⚠️ WARNING ⚠️
+
+{{ else -}}
+✅ Resolved ✅
+
+{{ end -}}
+📝 Alert: {{ .CommonLabels.alertname }}
+🖥️ Host: {{ .CommonLabels.instance }}
+{{ range .Alerts -}}
+ℹ️ Details: {{ .Annotations.description }}
+{{ end }}
+{{- if eq .Status "firing" }}
+🔕 Silence: {{ .ExternalURL }}
+📈 Grafana: # your grafana url
+{{- end }}
+{{- end }}
+
+
+
+{{- define "telegram.critical" -}}
+{{ if eq .Status "firing" -}}
+🚨 {{ .CommonLabels.severity | toUpper }} 🚨
+
+{{ else -}}
+✅ Resolved ✅
+
+{{ end -}}
+📝 Alert: {{ .CommonLabels.alertname }}
+🎯 Host: {{ .CommonLabels.instance }}
+{{ range .Alerts -}}
+📊 Details: {{ .Annotations.description }}
+{{ end }}
+{{- if eq .Status "firing" }}
+🔕 Silence: {{ .ExternalURL }}
+📈 Grafana: # your grafana url
+{{- end }}
+{{- end }}

@@ -1,0 +1,37 @@
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ ansible_dir }}", owner: "root", group: "root", mode: "755" }
+    - { path: "{{ blackbox_dir }}", owner: "root", group: "root", mode: "755" }
+
+- name: create config file
+  template:
+    src: templates/blackbox.j2
+    dest: "{{ blackbox_dir }}/blackbox.yml"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: blackbox_config
+
+- name: run blackbox container
+  docker_container:
+    name: "{{ blackbox_container_name }}"
+    image: "{{ blackbox_container_image }}"
+    ports: "{{ blackbox_container_ports }}"
+    state: started
+    memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    networks:
+      - name: "{{monitoring_network_name}}"
+        ipv4_address: "{{blackbox_container_ip}}"
+    restart_policy: always
+    capabilities:
+      - CAP_NET_RAW
+    volumes:
+      - "{{ blackbox_dir }}/blackbox.yml:/etc/blackbox/blackbox.yml"
+    command: "--config.file=/etc/blackbox/blackbox.yml"
+    restart: "{{ blackbox_config.changed }}"

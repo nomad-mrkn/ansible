@@ -1,0 +1,21 @@
+ {{- define "slack.silence.url" -}}
+{{- if eq .Status "firing" -}}
+http://#your prometheus url/#/silences/new?filter={
+    {{- range .CommonLabels.SortedPairs -}}
+        {{- if ne .Name "instance" -}}
+            {{- .Name }}%3D"{{- .Value | reReplaceAll " " "%20" -}}"%2C%20
+        {{- end -}}
+    {{- end -}}
+    instance%3D"{{ .CommonLabels.instance }}"} 
+{{- end -}}
+{{- end }}
+
+{{- define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:alert:{{ end }}{{ if eq .Status "resolved" }}:blob_happy:{{ end }} {{ .CommonLabels.instance }}]
+{{- end }}
+
+{{- define "slack.text" -}}
+{{ range .Alerts -}}
+{{ .Annotations.title }}{{ if .Labels.severity }}`{{ .Labels.severity }}`{{ end }} {{ .Annotations.description }}
+{{ end }}
+{{- end }}
