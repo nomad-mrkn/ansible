@@ -1,0 +1,19 @@
+- name: Add new hostname to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^\d+\.\d+\.\d+\.\d+\s+{{ inventory_hostname }}'
+    line: "127.0.0.1 {{ inventory_hostname }}"
+    state: present
+
+- name: update hostname file
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  register: host_name
+  notify: host_rename
+
+# - name: reboot
+#   reboot:
+#     connect_timeout: 10
+#     test_command: uptime
+#   become: yes
+#   when: host_name.changed

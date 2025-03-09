@@ -1,0 +1,42 @@
+- name: Update and upgrade system
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: Install required packages
+  apt:
+    name:
+      - htop
+      - curl
+      - net-tools
+      - traceroute
+#      - git
+#      - vim
+      - nano
+      - iptables-persistent
+      - ncdu
+      - telnet
+    state: present
+
+- name: Disable auto updates
+  apt:
+    name: unattended-upgrades
+    state: absent
+
+- name: Stop and disable unattended-upgrades service
+  systemd:
+    name: unattended-upgrades
+    state: stopped
+    enabled: no
+    masked: yes
+
+- name: Disable IPv6
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: "net.ipv6.conf.all.disable_ipv6", value: "1" }
+    - { name: "net.ipv6.conf.default.disable_ipv6", value: "1" }
+    - { name: "net.ipv6.conf.lo.disable_ipv6", value: "1" }

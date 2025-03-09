@@ -1,0 +1,4 @@
+- name: systemd-logind.service restart
+  become: true
+  shell: systemctl restart systemd-logind.service
+  listen: host_rename

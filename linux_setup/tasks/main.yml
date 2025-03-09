@@ -1,0 +1,19 @@
+- name: update_apps_disable
+  import_tasks: update_apps_disable.yml
+  tags:
+    - update_apps_disable
+
+- name: hostname
+  import_tasks: hostname.yml
+  tags:
+    - hostname
+
+- name: username
+  import_tasks: username.yml
+  tags:
+    - username
+
+- name: timezone
+  import_tasks: timezone.yml
+  tags:
+    - timezone
