@@ -1,0 +1,75 @@
+#!/bin/bash
+docker_running=false
+for i in {1..5}
+do
+    if systemctl is-active --quiet docker; then
+        docker_running=true
+        break
+    else
+        sleep 1
+    fi
+done
+
+logfile=/var/log/iptables.log
+date >> $logfile
+PS4=''
+set -x
+iptables -F INPUT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -p tcp --dport 53 -j ACCEPT
+iptables -A INPUT -s 127.0.0.1 -p tcp -j ACCEPT
+{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ipt_exporter, ipt_ipsec, ipt_site, ipt_mongo, ipt_pritunl, ipt_proxy, ipt_pm, ipt_nginx, ipt_mail, ipt_pm_vm, ipt_nginx_exporter, ipt_perforce, ipt_mongo_exporter, ipt_ipsec_exporter, ipt_vnc1, ipt_vnc2) -%}
+{%- if setrule is defined and setrule.docker is defined and setrule.source_address is defined and setrule.protocol is defined and setrule.destination_port is defined %}
+{%- if setrule.docker | default(False) == False %}
+iptables -A INPUT
+{%- if setrule.source_address is defined %}
+ -s {{ setrule.source_address }}
+{%- endif %}
+{%- if setrule.protocol is defined %}
+ -p {{ setrule.protocol }}
+  {%- if setrule.destination_port is defined %}
+    {%- if 'icmp-type' in setrule.destination_port|string %}
+ {{ setrule.destination_port }}
+    {%- elif ',' in setrule.destination_port|string %}
+ -m multiport --dports {{ setrule.destination_port }}
+    {%- else %}
+ --dport {{ setrule.destination_port }}
+  {%- endif %} {%- endif %}
+ -j ACCEPT
+{%- endif %} {%- endif %} {%- endif %}
+
+{% endfor %}
+
+if [ "$docker_running" = true ]; then
+iptables -F DOCKER-USER
+iptables -A DOCKER-USER -i docker0 -j RETURN
+iptables -A DOCKER-USER -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ipt_exporter, ipt_site, ipt_ipsec, ipt_mongo, ipt_pritunl, ipt_proxy, ipt_pm, ipt_nginx, ipt_mail, ipt_pm_vm, ipt_nginx_exporter, ipt_perforce, ipt_mongo_exporter, ipt_ipsec_exporter, ipt_vnc1, ipt_vnc2) -%}
+{%- if setrule is defined and setrule.docker is defined and setrule.source_address is defined and setrule.protocol is defined and setrule.destination_port is defined %}
+{%- if setrule.docker | default(False) == True %}
+iptables -A DOCKER-USER
+{%- if setrule.source_address is defined %}
+ -s {{ setrule.source_address }}
+{%- endif %}
+{%- if setrule.protocol is defined %}
+ -p {{ setrule.protocol }}
+  {%- if setrule.destination_port is defined %}
+    {%- if 'icmp-type' in setrule.destination_port|string %}
+ {{ setrule.destination_port }}
+    {%- elif ',' in setrule.destination_port|string %}
+ -m multiport --dports {{ setrule.destination_port }}
+    {%- else %}
+ --dport {{ setrule.destination_port }}
+  {%- endif %} {%- endif %}
+ -j RETURN
+{%- endif %} {%- endif %} {%- endif %}
+
+{% endfor %}
+iptables -A DOCKER-USER -j LOG --log-prefix "Packet Dropped by DOCKER-USER:"
+iptables -A DOCKER-USER -j DROP
+iptables -A INPUT -i docker0 -s 172.17.0.0/24 -p tcp -j ACCEPT
+fi
+
+iptables -A INPUT -j LOG --log-prefix "Packet Dropped by INPUT:"
+iptables -A INPUT -j DROP

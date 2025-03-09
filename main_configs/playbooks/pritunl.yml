@@ -1,0 +1,28 @@
+- hosts: pritunl-main, pritunl-server
+  become: yes
+  roles:
+    - docker-run
+  vars:
+    run_docker_name: pritunl
+    run_docker_image: harbor.playful-fairies.com/sysadmin/pritunl:1.32.3660.72-focal
+    run_docker_ports: "{{ pritunl_ports }}"
+    run_docker_state: started
+    run_docker_restart_policy: always
+    run_docker_capabilities:
+      - NET_ADMIN
+    run_docker_volumes:
+      - /var/lib/pritunl:/var/lib/pritunl
+    run_docker_networks:
+      - name: pritunl-net
+    run_docker_network_name: pritunl-net
+    run_docker_network_driver: bridge
+    run_docker_env:
+      MONGO_USER: "{{ var_mongo_user }}"
+      MONGO_PASS: "{{ mongo_pass }}"
+      PRITUNL_MONGODB_URI: "mongodb://mongoadmin:bg6ZTsY0t9Kq@5.182.36.254:27017/pritunl?authSource=admin"
+
+  pre_tasks:
+    - name: Create docker network
+      docker_network:
+        name: "{{ run_docker_network_name }}"
+        driver: "{{ run_docker_network_driver }}"

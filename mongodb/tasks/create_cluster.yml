@@ -1,0 +1,66 @@
+- name: check cluster status
+  community.mongodb.mongodb_shell:
+    login_host: "{{ inventory_hostname }}"
+    login_user: "{{ mongo_user }}"
+    login_password: "{{ mongo_pass }}"
+    eval: "rs.status()"
+    additional_args:
+      tls: True
+      tlsCACerts:
+        PEMKeyFile: "{{ mongo_pem }}"
+  register: replica_status
+  failed_when: False
+  changed_when: False
+
+- name: display cluster status
+  debug:
+    var: replica_status
+  run_once: true
+
+- name: check if the string "no replset config has been received" is in the output
+  set_fact:
+    no_config_received: "{{ 'MongoServerError: no replset config has been received' in replica_status.msg }}"
+
+- name: create cluster only if it does not exist
+  community.mongodb.mongodb_shell:
+    login_host: "{{ inventory_hostname }}"
+    login_user: "{{ mongo_user }}"
+    login_password: "{{ mongo_pass }}"
+    eval: >
+      rs.initiate({
+        _id: "{{ cluster_name }}",
+        members: [
+          {% for host in groups[cluster_group] %}
+          { _id: {{ loop.index0 }}, host: "{{ hostvars[host]['inventory_hostname'] }}:27017" }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]
+      })
+    additional_args:
+      tls: True
+      tlsCACerts:
+        PEMKeyFile: "{{ mongo_pem }}"
+  when: no_config_received
+  run_once: true
+
+- name: wait for 5 seconds
+  wait_for:
+    timeout: 5
+
+- name: check cluster status
+  community.mongodb.mongodb_shell:
+    login_host: "{{ inventory_hostname }}"
+    login_user: "{{ mongo_user }}"
+    login_password: "{{ mongo_pass }}"
+    eval: "rs.status()"
+    additional_args:
+      tls: True
+      tlsCACerts:
+        PEMKeyFile: "{{ mongo_pem }}"
+  register: replica_status
+  failed_when: False
+  changed_when: False
+
+- name: display cluster status
+  debug:
+    var: replica_status
+  run_once: true

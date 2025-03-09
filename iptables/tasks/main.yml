@@ -1,0 +1,55 @@
+- name: create /data/iptables directory
+  file:
+    path: /data/iptables
+    state: directory
+
+- name: create ipt_dev.sh and ipt_prod.sh
+  file:
+    path: "{{ item.path }}"
+    state: touch
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "/data/iptables/ipt_dev.sh", mode: "0755" }
+    - { path: "/data/iptables/ipt_prod.sh", mode: "0755" }
+
+- name: copy ipt_prod.sh to ipt_dev.sh
+  copy:
+    src: /data/iptables/ipt_prod.sh
+    dest: /data/iptables/ipt_dev.sh
+    remote_src: yes
+    mode: '0755'
+
+- name: copy iptables rules
+  template:
+    src: "templates/ipt_dev.j2"
+    dest: "/data/iptables/ipt_dev.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: run ipt_dev.sh to apply new iptables rules (to apply run role with the -e iptables_dev=yes)
+  command: sudo /data/iptables/ipt_dev.sh
+  when: iptables_dev == 'yes'
+
+- name: check SSH (to apply run role with the -e iptables_dev=yes OR -e iptables_prod=yes)
+  delegate_to: localhost
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 22
+    timeout: 5
+  when:  iptables_dev == 'yes' or iptables_prod == 'yes'
+
+- name: copy ipt_dev.sh to ipt_prod.sh (to apply run role with the -e iptables_prod=yes)
+  copy:
+    src: /data/iptables/ipt_dev.sh
+    dest: /data/iptables/ipt_prod.sh
+    remote_src: yes
+    mode: '0755'
+  when: iptables_prod == 'yes'
+
+- name: create cron task for dev_test.sh (to apply run role with the -e iptables_prod=yes)
+  cron:
+    name: "run iptables script on reboot"
+    special_time: reboot
+    job: "sudo /data/iptables/ipt_prod.sh >> /var/log/iptables.log 2>&1"
+  when: iptables_prod == 'yes'

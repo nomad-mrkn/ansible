@@ -1,0 +1,103 @@
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ mongo_path }}", owner: 101, group: 101, mode: "755" }
+    - { path: "{{ mongo_path }}/mongodb", owner: 999, group: 999, mode: "700" }
+
+- name: Create config, key and script files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "templates/mongod.conf.j2", dest: "{{ mongo_path }}/mongod.conf.j2", owner: 101, group: 101, mode: "644" }
+    - { src: "templates/mongod.key", dest: "{{ mongo_path }}/mongod.key", owner: 999, group: 999, mode: "400" }
+    - { src: "templates/recreate_ssl.j2", dest: "{{ mongo_path }}/recreate_ssl", owner: 101, group: 101, mode: "755" }
+    - { src: "templates/create_backup.j2", dest: "{{ mongo_path }}/create_backup.sh", owner: 101, group: 101, mode: "755" }
+
+- name: schedule create_backup to run daily at 3AM
+  cron:
+    name: "mongo-backup job"
+    minute: "0"
+    hour: "3"
+    job: "{{ mongo_path }}/create_backup.sh"
+
+- name: run certbot role
+  include_role:
+    name: certbot-route53
+  when: certbot
+
+- name: fetch privkey.pem and fullchain.pem
+  fetch:
+    src: "/etc/letsencrypt/live/{{ inventory_hostname }}/{{ item }}"
+    dest: "/tmp/{{ inventory_hostname }}/{{ item }}"
+    flat: yes
+    fail_on_missing: yes
+  loop:
+    - privkey.pem
+    - fullchain.pem
+  when: certbot
+
+- name: deploy cron job
+  cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute|default('*')}}"
+    hour: "{{ item.hour|default('*')}}"
+    day: "{{ item.day|default('*')}}"
+    weekday: "{{ item.weekday|default('*') }}"
+    month: "{{ item.month|default('*')}}"
+    job: "{{ item.job }}"
+  with_items: "{{ certbot_cron }}"
+  tags:
+    - cron
+
+- name: concatenate privkey.pem and fullchain.pem
+  vars:
+    files:
+      - "/tmp/{{ inventory_hostname }}/privkey.pem"
+      - "/tmp/{{ inventory_hostname }}/fullchain.pem"
+  template:
+    src: "templates/mongodb.pem.j2"
+    dest: "/etc/letsencrypt/live/{{ inventory_hostname }}/mongodb.pem"
+  when: certbot
+
+- name: Set permissions for mongodb.pem
+  file:
+    path: "/etc/letsencrypt/live/{{ inventory_hostname }}/mongodb.pem"
+    owner: 999
+    group: 999
+    mode: "600"
+  when: certbot
+
+- name: install gnupg and lftp
+  apt:
+    name:
+       - gnupg
+       - lftp
+    state: present
+
+- name: add MongoDB public key
+  apt_key:
+    url: "https://www.mongodb.org/static/pgp/server-7.0.asc"
+    state: present
+- name: add MongoDB repository
+  apt_repository:
+    repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/7.0 multiverse"
+    state: present
+
+- name: update apt and install mongodb-mongosh
+  apt:
+    name: mongodb-mongosh
+    update_cache: yes
+    state: present
+
+- name: run docker mongodb
+  include_role:
+    name: docker-run

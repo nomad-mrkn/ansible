@@ -1,0 +1,22 @@
+mongo_path: "{{ var_mongo_path | default('/data/mongo') }}"
+mongo_port: "{{ var_mongo_port | default('27017') }}"
+cluster_name: "{{ var_cluster_name | default('replication') }}"
+mongo_key: "{{ var_mongo_key | default('/etc/mongod.key') }}"
+mongo_pem:  "{{ var_mongo_pem | default('/etc/ssl/mongodb.pem') }}"
+mongo_user: "{{ var_mongo_user | default('mongoadmin') }}"
+mongo_pass: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          35626265653038343064366266393763376137376134393936313865666161306665383339616631
+          3630333134666332313930643434323466323331333536610a313466323363623665663635363666
+          34626639303733623238666432336264363338383630356434663034323665393266366361636461
+          3862623437393531610a623665383661323865313365623564343037373633633437626165343835
+          3134
+cluster_group: "{{ name_group_vars | default('mongo_cluster') }}"
+cluster: "{{ is_cluster | default( false ) }}"
+certbot: "{{ is_certbot | default( false ) }}"
+certbot_cron:
+  - name: renew_ssl
+    minute: 0
+    hour: 0
+    weekday: 1
+    job: /usr/local/bin/certbot renew

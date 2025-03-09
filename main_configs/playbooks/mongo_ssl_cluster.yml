@@ -1,0 +1,23 @@
+- hosts: mongo_cluster
+  become: yes
+  roles:
+    - mongodb
+  vars:
+    run_docker_name: mongo
+    run_docker_image: harbor.playful-fairies.com/sysadmin/mongo:5.0.21-rc0-focal
+    run_docker_ports:
+      - "{{ mongo_port }}:{{ mongo_port }}"
+    run_docker_state: started
+    run_docker_restart_policy: always
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_volumes:
+      - "{{ mongo_path }}/mongodb:/var/lib/mongodb:rw"
+      - "{{ mongo_path }}/mongod.key:{{ mongo_key }}"
+      - "{{ mongo_path }}/mongod.conf.j2:/etc/mongod.conf"
+      - "{{ mongo_path }}/pritunl:/tmp/pritunl"
+      - "{{ mongo_path }}/admin:/tmp/admin"
+      - "/etc/letsencrypt/live/{{ inventory_hostname }}/mongodb.pem:{{ mongo_pem }}"
+    run_docker_command: --config /etc/mongod.conf --bind_ip_all
+    run_docker_env:
+      MONGO_INITDB_ROOT_USERNAME: "{{ mongo_user }}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{ mongo_pass }}"

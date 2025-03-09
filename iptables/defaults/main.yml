@@ -1,0 +1,26 @@
+iptables_dev: no
+iptables_prod: no
+ipt_ssh:
+  docker: false
+  destination_port: 22
+  protocol: tcp
+  source_address:
+    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+   {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
+   {% endfor %}"
+ipt_icmp:
+  docker: false
+  destination_port: --icmp-type any
+  protocol: icmp
+  source_address:
+    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+   {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
+   {% endfor %}"
+ipt_node_exporter:
+  docker: false
+  destination_port: 9100
+  protocol: tcp
+  source_address:
+    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+   {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
+   {% endfor %}"

@@ -1,0 +1,59 @@
+- hosts: mongo_cluster
+  become: yes
+  tasks:
+    - name: check who is primary
+      community.mongodb.mongodb_shell:
+        login_host: "{{ inventory_hostname }}"
+        login_user: "{{ var_mongo_user }}"
+        login_password: "{{ mongo_pass }}"
+        eval: 'rs.isMaster().ismaster'
+        additional_args:
+          tls: True
+          tlsCACerts:
+            PEMKeyFile: "{{ var_mongo_pem }}"
+      register: is_master
+      failed_when: False
+      changed_when: False
+
+    - name: Check if database exists and pritunl in databases
+      community.mongodb.mongodb_shell:
+        login_host: "{{ inventory_hostname }}"
+        login_user: "{{ var_mongo_user }}"
+        login_password: "{{ mongo_pass }}"
+        eval: 'db.adminCommand("listDatabases")'
+        additional_args:
+          tls: True
+          tlsCACerts:
+            PEMKeyFile: "{{ var_mongo_pem }}"
+      register: db_output
+      failed_when: False
+      changed_when: False
+      run_once: true
+      when: is_master.transformed_output[0] == 'true'
+
+    - set_fact:
+        is_pritunl_present: "{{ 'pritunl' in (db_output.transformed_output.databases | map(attribute='name') | list) }}"
+      run_once: true
+
+    - name: Download latest backup file from FTP
+      get_url:
+        url: "ftp://{{ ftp_user }}:{{ ftp_pass_cod }}@{{ ftp_path }}/{{ ftp_latest_file }}"
+        dest: "{{ var_mongo_path }}/{{ ftp_latest_file }}"
+        mode: '0644'
+      when: is_master.transformed_output[0] == 'true'
+
+    - name: Unarchive the dump
+      unarchive:
+        src: "{{ var_mongo_path }}/{{ ftp_latest_file }}"
+        dest: "{{ var_mongo_path }}"
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+      when: is_master.transformed_output[0] == 'true'
+
+    - name: restore pritunl database on master node
+      shell: |
+        docker exec mongo mongorestore --host {{ inventory_hostname }} --username={{ var_mongo_user }} --password={{ mongo_pass }} --ssl /tmp
+      when: (not is_pritunl_present) and (is_master.transformed_output[0] == 'true')
+      run_once: true

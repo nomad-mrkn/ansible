@@ -1,0 +1,4 @@
+certbot_route53_domains: []
+certbot_route53_mail: # your certbot_route53_mail
+certbot_route53_aws_key_id: # your certbot_route53_aws_key_id
+certbot_route53_aws_key: # your certbot_route53_aws_key

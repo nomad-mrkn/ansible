@@ -1,0 +1,9 @@
+ansible_user:
+user_name:
+server_user:
+sudo_visudo: '/usr/sbin/visudo'
+ansible_dir: /opt/ansible
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -o StrictHostKeyChecking=no -W %h:%p -q user@server_jump_ip"'
+ldap_pass:
+privkey:
+fullchain:

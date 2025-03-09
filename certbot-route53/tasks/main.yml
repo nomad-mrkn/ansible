@@ -1,0 +1,25 @@
+- pip:
+    name:
+      - pyOpenSSL==22.1.0
+      - certbot
+      - certbot-dns-route53
+      - botocore
+    state: latest
+
+- name: Create aws dir
+  file:
+    state: directory
+    path: "~/.aws"
+
+- name: Add aws config
+  template:
+    src: config.j2
+    dest: "~/.aws/config"
+    mode: 0600
+
+- name: Create LE challenge to get certs
+  shell: >
+    certbot certonly -n --dns-route53
+    -d {{ certbot_route53_domains | join(' -d ') }}
+    --agree-tos -m {{ certbot_route53_mail }}
+    {% if certbot_route53_deploy_hook is defined %}--deploy-hook="{{ certbot_route53_deploy_hook }}"{% endif %}

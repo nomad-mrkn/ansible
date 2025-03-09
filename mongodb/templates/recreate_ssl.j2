@@ -1,0 +1,6 @@
+#!/bin/bash
+
+sudo cat /etc/letsencrypt/live/"{{ inventory_hostname }}"/privkey.pem /etc/letsencrypt/live/"{{ inventory_hostname }}"/fullchain.pem | sudo tee /etc/letsencrypt/live/"{{ inventory_hostname }}"/mongodb.pem >/dev/null
+sudo chown 999:999 /etc/letsencrypt/live/"{{ inventory_hostname }}"/mongodb.pem
+sudo chmod 600 /etc/letsencrypt/live/"{{ inventory_hostname }}"/mongodb.pem
+sudo mongosh --host "{{ inventory_hostname }}" --port "{{ mongo_port }}" -u "{{ mongo_user }}" -p "{{ mongo_pass }}" --ssl --authenticationDatabase admin --eval 'db.adminCommand( { rotateCertificates: 1 } )'

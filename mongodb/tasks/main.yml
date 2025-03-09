@@ -1,0 +1,10 @@
+- name: create_container
+  import_tasks: create_container.yml
+  tags :
+    - create_container
+
+- name: create_cluster
+  import_tasks: create_cluster.yml
+  tags :
+    - create_cluster
+  when: cluster

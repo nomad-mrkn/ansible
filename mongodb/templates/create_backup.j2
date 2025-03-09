@@ -1,0 +1,22 @@
+#!/bin/bash
+
+cd {{ mongo_path }}
+MONGOSHELL_OUTPUT=$(mongosh --host {{ inventory_hostname }} --port {{ mongo_port }} -u {{ mongo_user }} -p {{ mongo_pass }} --tls --authenticationDatabase admin --eval 'rs.isMaster().ismaster' | tail -n 1)
+
+if [[ $MONGOSHELL_OUTPUT == "true" ]]
+then
+  exit 0
+fi
+
+if [[ $MONGOSHELL_OUTPUT == "false" ]]
+then
+  docker exec mongo mongodump --username={{ mongo_user }} --password={{ mongo_pass }} --authenticationDatabase=admin --ssl --host={{ inventory_hostname }} --port={{ mongo_port }} --out=/dump
+  sudo docker cp mongo:/dump/admin {{ mongo_path }}
+  sudo docker cp mongo:/dump/pritunl {{ mongo_path }}
+  current_date=$(date +%d-%m-%Y)
+  tar -czvf "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" admin pritunl
+  ln -sf "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" "mongodump_latest.tar.gz"
+  curl -T "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" ftp://141.95.47.157/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
+  curl -T "mongodump_latest.tar.gz" ftp://141.95.47.157/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
+  rm -r admin pritunl "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz"
+fi
