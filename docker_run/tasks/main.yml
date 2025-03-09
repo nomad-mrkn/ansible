@@ -1,0 +1,32 @@
+- name: Application container
+  docker_container:
+    name: "{{ run_docker_name | default('webserver') }}"
+    image: "{{ run_docker_image }}"
+    network_mode: "{{ run_docker_network_mode | default('bridge') }}"
+    networks: "{{ run_docker_networks | default(omit) }}"
+    volumes: "{{ run_docker_volumes | default(omit) }}"
+    restart_policy: "{{ run_docker_restart_policy | default(\"unless-stopped\") }}"
+    state: "{{ run_docker_state | default('started') }}"
+    recreate: "{{ run_docker_recreate | default('no') }}"
+    log_driver: "{{ run_docker_log_driver | default('json-file') }}"
+    log_options: "{{ run_docker_log_options | default({\"max-size\":\"20m\",\"max-file\":\"5\"}) }}"
+    expose: "{{ run_docker_expose | default(omit) }}"
+    ports: "{{ run_docker_ports | default(omit) }}"
+    sysctls: "{{ run_docker_sysctls | default(omit) }}"
+    command: "{{ run_docker_command | default(omit) }}"
+    pull: "{{ run_docker_pull | default('always') }}"
+#    hostname: "{{ run_docker_hostname | default(inventory_hostname_short) }}"
+    env: "{{ run_docker_env | default(omit) }}"
+    timeout: "{{ run_docker_timeout | default(120) }}"
+    stop_timeout: "{{ run_docker_stop_timeout | default(omit) }}"
+    etc_hosts: "{{ run_docker_etc_hosts | default(omit) }}"
+    entrypoint: "{{ run_docker_entrypoint | default(omit) }}"
+    memory: "{{ run_docker_memory | default(0) }}"
+    dns_servers: "{{ run_docker_dns_servers | default(omit) }}"
+    dns_search_domains: "{{ run_docker_dns_search_domains | default(omit) }}"
+    cpuset_cpus: "{{ run_docker_cpu_cpuset_cpus | default(omit) }}"
+    capabilities: "{{ run_docker_capabilities | default(omit) }}"
+  # register: application_container
+  # retries: 5
+  # delay: 15
+  # until: application_container is succeeded

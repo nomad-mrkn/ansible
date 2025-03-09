@@ -1,0 +1,87 @@
+- name: Check if distribution is supported
+  fail:
+    msg: "Distribution {{ ansible_distribution }} {{ ansible_distribution_version }} is not supported"
+  when: docker_versions[ansible_distribution ~ '-' ~ ansible_distribution_version] is not defined
+
+- name: Install Docker components
+  block:
+    - name: Update and install required packages
+      apt:
+        update_cache: yes
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Add Dockers official GPG key
+      apt_key:
+        url: "{{ docker_gpg_url }}"
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "{{ docker_apt_repo }}"
+        update_cache: yes
+      register: apt_update_cache
+      until: apt_update_cache is succeeded
+      retries: 5
+      delay: 30
+
+- name: Create Docker configuration
+  block:
+    - name: Create Docker config directory
+      file:
+        path: "{{ docker_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create Docker daemon.json
+      copy:
+        dest: "{{ docker_dir }}/daemon.json"
+        content: |
+          {
+            "bip": "192.168.168.1/16",
+            "default-address-pools": [
+                  {
+                      "base": "10.10.0.0/16",
+                      "size": 24
+                  }
+              ]
+          }
+        mode: "0644"
+
+- name: Install Docker packages and configure
+  block:
+    - name: Install Docker components
+      apt:
+        name:
+          - docker-ce={{ docker_version }}
+          - docker-ce-cli={{ docker_version }}
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+          - python3-docker
+        state: present
+        allow_downgrade: yes
+        force: yes
+
+    - name: Add {{server_user}} to group
+      user:
+        name: "{{server_user}}"
+        groups: docker
+        append: yes
+      register: add_user_group
+
+    - name: Ensure Docker service is started and enabled
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: not add_user_group.changed
+
+    - name: Restart Docker service if user group was changed
+      service:
+        name: docker
+        state: restarted
+      when: add_user_group.changed

@@ -1,0 +1,11 @@
+- name: docker_rootfull
+  import_tasks: docker_rootfull.yml
+  tags:
+    - docker_rootfull
+  when: "'docker_rootfull' in ansible_run_tags"
+
+- name: docker_rootless
+  import_tasks: docker_rootless.yml
+  tags :
+    - docker_rootless
+  when: "'docker_rootless' in ansible_run_tags"

@@ -1,0 +1,184 @@
+- name: Check if Docker service is running
+  systemd:
+    name: docker
+    state: started
+  register: docker_service
+  ignore_errors: true
+
+- name: Disable Docker service and socket if Docker is running
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - docker.service
+    - docker.socket
+  when: docker_service is success
+
+- name: Remove Docker socket file
+  file:
+    path: /var/run/docker.sock
+    state: absent
+  when: docker_service is success
+
+- name: Install required packages
+  apt:
+    update_cache: yes
+    name:
+      - uidmap
+      - dbus-user-session
+      - slirp4netns
+      - fuse-overlayfs
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Ensure subuid and subgid mappings are correct
+  lineinfile:
+    path: "{{ item }}"
+    regexp: "^{{ docker_user }}:"
+    line: "{{ docker_user }}:{{ subuid_start }}:{{ subuid_range }}"
+    state: present
+    backup: yes
+  loop:
+    - "{{ docker_rootless_uid }}"
+    - "{{ docker_rootless_gid }}"
+
+- name: Create Docker config directory
+  become: false
+  file:
+    path: "{{ docker_rootless_dir }}"
+    state: directory
+    owner: "{{ docker_user }}"
+    group: "{{ docker_user }}"
+    mode: "0755"
+
+- name: Configure Docker daemon
+  become: false
+  copy:
+    dest: "{{ docker_rootless_dir }}/daemon.json"
+    content: |
+      {
+        "bip": "192.168.168.1/16",
+        "default-address-pools": [
+          {
+            "base": "10.10.0.0/16",
+            "size": 24
+          }
+        ]
+      }
+    owner: "{{ docker_user }}"
+    group: "{{ docker_user }}"
+    mode: "0644"
+
+- name: Get user information
+  become: false
+  getent:
+    database: passwd
+    key: "{{ ansible_user }}"
+  register: user_info
+
+- name: Check if dockerd-rootless-setuptool.sh is already downloaded
+  become: false
+  stat:
+    path: "{{ docker_rootless_dir }}/dockerd-rootless-setuptool.sh"
+  register: script_downloaded
+
+- name: Download dockerd-rootless-setuptool.sh (only if not downloaded)
+  become: false
+  get_url:
+    url: "{{ docker_rootless_link }}"
+    dest: "{{ docker_rootless_dir }}/dockerd-rootless-setuptool.sh"
+    checksum: "{{ docker_rootless_checksum }}"
+    mode: '0755'
+  when: not script_downloaded.stat.exists
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ user_info.ansible_facts.getent_passwd[docker_user][1] }}"
+
+- name: Check if Docker rootless is already installed
+  become: false
+  stat:
+    path: "/run/user/{{ user_info.ansible_facts.getent_passwd[docker_user][1] }}/docker.sock"
+  register: docker_installed
+
+- name: Run dockerd-rootless-setuptool.sh install (only if Docker is not installed)
+  become: false
+  shell: "{{ docker_rootless_dir }}/dockerd-rootless-setuptool.sh install"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ user_info.ansible_facts.getent_passwd[docker_user][1] }}"
+  when: not docker_installed.stat.exists
+
+- name: Configure environment variables
+  blockinfile:
+    path: "/home/{{ docker_user }}/.bashrc"
+    block: |    
+      # Docker Rootless Configuration    
+      export PATH=/usr/bin:$PATH    
+      export DOCKER_HOST=unix:///run/user/{{ user_info.ansible_facts.getent_passwd[docker_user][1] }}/docker.sock
+    marker: "# {mark} DOCKER CONFIG"
+    owner: "{{ docker_user }}"
+    group: "{{ docker_user }}"
+    mode: "0640"
+
+- name: Enable user lingering
+  systemd:
+    name: "user@{{ user_info.ansible_facts.getent_passwd[docker_user][1] }}.service"
+    state: started
+    enabled: yes
+
+- name: Manage Docker rootless service
+  become: false
+  systemd:
+    name: docker.service
+    scope: user
+    state: started
+    enabled: yes
+
+- name: Check Docker rootless service status
+  become: false
+  command: systemctl --user status docker.service
+  register: docker_status
+  changed_when: false
+
+- name: Show only Docker service status line
+  debug:
+    msg: "{{ docker_status.stdout | regex_search('Active: .*', '\\0') }}"
+
+- name: Add Dockers official GPG key
+  apt_key:
+    url: "{{ docker_gpg_url }}"
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "{{ docker_apt_repo }}"
+    update_cache: yes
+  register: apt_update_cache
+  until: apt_update_cache is succeeded
+  retries: 5
+  delay: 30
+
+- name: Install Docker components
+  apt:
+    name:
+      - docker-compose-plugin
+      - python3-docker
+    state: present
+    allow_downgrade: yes
+    force: yes
+
+- name: Gather package facts
+  package_facts:
+    manager: auto
+  when: docker_service is failed
+
+- name: Fail if docker-compose-plugin is not installed
+  fail:
+    msg: "docker-compose-plugin is required"
+  when: "'docker-compose-plugin' not in ansible_facts.packages"
+
+- name: Fail if python3-docker is not installed
+  fail:
+    msg: "python3-docker is required"
+  when: "'python3-docker' not in ansible_facts.packages"

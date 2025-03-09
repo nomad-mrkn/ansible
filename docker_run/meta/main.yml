@@ -1,0 +1,7 @@
+galaxy_info:
+  author: nomad_mrkn
+  description: Run docker container
+  company: []
+  license: MIT
+  min_ansible_version: 2.4
+  galaxy_tags: []

@@ -1,0 +1,1 @@
+run_docker_image: "{{ docker_image | default('hello-world') }}"
