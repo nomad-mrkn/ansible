@@ -1,0 +1,19 @@
+- hosts: is-ru1a-prometheus
+  roles:
+    - grafana
+  vars:
+    run_docker_name: grafana
+    run_docker_image: # your image
+    run_docker_ports: 127.0.0.1:3000:3000
+    run_docker_state: started
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_networks:
+      - name: # your name
+        ipv4_address: # your ip
+    run_docker_restart_policy: "always"
+    run_docker_volumes:
+      - /opt/ansible/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - /opt/ansible/grafana/ldap.toml:/etc/grafana/ldap.toml
+      - /opt/ansible/grafana/logs:/var/log/grafana
+      - /opt/ansible/grafana/provisioning:/etc/grafana/provisioning
+      - /opt/ansible/grafana/ssl:/etc/grafana/ssl

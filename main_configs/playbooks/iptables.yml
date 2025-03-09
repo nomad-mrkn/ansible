@@ -1,0 +1,4 @@
+- hosts: iptables_test
+  become: yes
+  roles:
+    - iptables

@@ -1,0 +1,586 @@
+host_config: |
+  127.0.0.1	localhost prometheus
+  ::1		localhost prometheus ip6-localhost ip6-loopback
+  ff02::1		ip6-allnodes
+  ff02::2		ip6-allrouters
+  127.0.0.1 prometheus
+
+  linux
+  dev
+  prod
+  
+  windows
+  dev  
+  prod
+
+prometheus_config: |
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+    scrape_timeout: 10s
+    external_labels:
+      cluster_name: is
+      environment: production
+
+  alerting:
+    alertmanagers:
+      - static_configs:
+          - targets: # your alertmanager ip:port
+        timeout: 10s
+  
+  rule_files:
+    - "rules.yml"
+  
+  scrape_configs:
+    - job_name: "prometheus"
+      scrape_interval: 10s
+      static_configs:
+        - targets: ['localhost:9090']
+      metric_relabel_configs:
+        - action: labeldrop
+          regex: "^(id|name)$" 
+
+    - job_name: "blackbox"
+      relabel_configs: &blackbox_relabel
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: # your blackbox ip:port
+
+    - job_name: "blackbox_https"
+      metrics_path: /probe
+      scheme: http
+      follow_redirects: true
+      scrape_timeout: 15s
+      params:
+        module: [http_2xx]
+      static_configs:
+        - targets: 
+          labels:
+            env: 'prod'
+      relabel_configs: *blackbox_relabel
+  
+    - job_name: 'blackbox_api'
+      metrics_path: /probe
+      scheme: http
+      params:
+        module: [http_2xx_json]
+      static_configs:
+        - targets:
+          labels:
+            env: 'prod'
+      relabel_configs: *blackbox_relabel
+  
+    - job_name: 'blackbox_redis'
+      metrics_path: /probe
+      params:
+        module: [tcp_connect]
+      static_configs:
+        - targets:
+          labels:
+            env: 'prod'
+      relabel_configs: *blackbox_relabel
+  
+    - job_name: 'blackbox_dns'
+      metrics_path: /probe
+      params:
+        module: [dns_lookup]
+      file_sd_configs:
+        - files:
+          - '/etc/prometheus/dns_targets.yml'
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [query_name]
+          target_label: __param_query_name
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: 10.10.0.13:9115
+        - target_label: env
+          replacement: 'prod'
+
+    - job_name: "blackbox_icmp"
+      metrics_path: /probe
+      params:
+        module: [icmp]
+      static_configs:
+        - targets:
+          labels:
+            env: 'dev'
+            group: 'linux-dev'
+        - targets:
+          labels:
+            env: 'prod'
+            group: 'linux-prod'
+        - targets:
+          labels:
+            env: 'dev'
+            group: 'windows-dev'
+      scrape_timeout: 5s
+      relabel_configs: *blackbox_relabel
+  
+    - job_name: "containers_statuses"
+      metrics_path: /metrics
+      static_configs:
+        - targets:
+          labels:
+            env: 'prod'
+            group: 'linux-prod'
+      relabel_configs: &blackbox_relabel
+      - source_labels: [__address__]
+        regex: '(.*):.*'
+        replacement: '$1'
+        target_label: instance
+
+  #node_exporter
+    - job_name: "node_exporter"
+      metrics_path: /metrics
+      static_configs:
+        - targets:
+          labels:
+            env: 'dev'
+            group: 'linux-dev'
+        - targets:
+          labels:
+            env: 'prod'
+            group: 'linux-prod'
+      relabel_configs: &blackbox_relabel
+      - source_labels: [__address__]
+        regex: '(.*):.*'
+        replacement: '$1'
+        target_label: instance
+
+  #windows_exporter
+    - job_name: "windows_exporter"
+      metrics_path: /metrics
+      static_configs:
+        - targets:
+          labels:
+            env: 'dev'
+            group: 'windows-dev'
+        - targets:
+          labels:
+            env: 'prod'
+            group: 'windows-prod'
+      relabel_configs: *blackbox_relabel
+
+rules_config: |
+   {% raw %}groups:
+     - name: chatwoot_alerts
+       rules:
+          - alert: Chatwoot API Down
+            expr: probe_success{job="blackbox_api"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "Chatwoot API is down for {{ $labels.instance }}"
+              description: "API health check failed for more than 2 minutes"
+        
+          - alert: Chatwoot Redis Down
+            expr: probe_success{job="blackbox_redis"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "Redis connection failed for {{ $labels.instance }}"
+              description: "Redis health check failed for more than 2 minutes"
+        
+          - alert: Chatwoot DNS Failed
+            expr: probe_success{job="blackbox_dns"} == 0
+            for: 2m
+            labels:
+              severity: warning
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "DNS lookup failed for {{ $labels.instance }}"
+              description: "DNS health check failed for more than 2 minutes"
+        
+          - alert: API High Latency
+            expr: probe_duration_seconds{job="blackbox_api"} > 4.5
+            for: 2m
+            labels:
+              severity: warning
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "High API latency for {{ $labels.instance }}"
+              description: "API response time is higher than 4.5 seconds"
+    
+     - name: Container_rules
+       rules:
+          - alert: Container is down
+            expr: docker_container_state == 1 or docker_container_state == 1 or docker_container_state == 1
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              description: "The container {{ $labels.name }} on instance {{ $labels.instance }} is not running"  
+  
+     - name: Common rules
+       rules:
+          #Exporter is not available
+          - alert: Exporter is not available
+            expr: up != 1
+            for: 1m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "Host is not available"
+              description: "Host is not available"
+  
+          #Probe success
+          - alert: Host is unavaliable
+            expr: probe_success == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Host is not running"
+              description: "Host is not running"
+
+          - alert: High errors on the port
+            expr: ifInErrors + ifOutErrors > 1000
+            for: 5m
+            labels:
+              severity: warning
+              env: '{{ $labels.env }}'
+            annotations:
+              description: "Errors on port {{ $labels.ifIndex }}, count {{ $value }}"
+
+          #SSL Timeout critical  
+          - alert: SSL Cert Expiring Soon  
+            expr: max_over_time(avg_over_time(probe_ssl_earliest_cert_expiry[5m])[15m:1m]) - time() < 86400 * 7 and on(instance) (count_over_time(probe_success[15m]) >= 10)
+            for: 1h
+            keep_firing_for: 1h
+            labels:  
+              severity: warning  
+              env: '{{ $labels.env }}'  
+            annotations:  
+              description: "TLS certificate will expire in {{ $value | humanizeDuration }}"
+  
+
+          #Memory high
+          - alert: Memory usage is high
+            expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.97 or ((windows_cs_physical_memory_bytes - windows_os_physical_memory_free_bytes) / windows_cs_physical_memory_bytes > 0.97)
+            for: 15m
+            labels:
+              severity: warning
+              env: '{{ $labels.env }}'
+            annotations:
+              description: "Memory usage is {{ $value | humanizePercentage }} for more than 15 min"
+
+
+          #Memory critical high
+          - alert: Memory usage is critical high
+            expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.97 or ((windows_cs_physical_memory_bytes - windows_os_physical_memory_free_bytes) / windows_cs_physical_memory_bytes > 0.97)
+            for: 30m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              description: "Memory usage is {{ $value | humanizePercentage }} more 30 min"
+
+
+          #Low disk volume
+          - alert: Disk volume is low
+            expr: |-
+              ((windows_logical_disk_size_bytes - windows_logical_disk_free_bytes) / windows_logical_disk_size_bytes > 0.95) or 
+              ((node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.95)
+            for: 30m
+            labels:
+              severity: warning
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "Volume is low"
+              description: "Disk {{ $labels.volume }} more 95% filled ({{ $value | humanizePercentage }})"
+  
+  
+          #High traffic on interface
+          - alert: High traffic on interface
+            expr: |-
+              ((rate(node_network_receive_bytes_total[2m]) + rate(node_network_transmit_bytes_total[2m]))  / 1000 / 1000 * 8 > 700) or
+              ((rate(windows_net_bytes_sent_total[2m]) + rate(windows_net_bytes_received_total[2m])) / 1000 / 1000 * 8 > 700)
+            for: 30m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "High traffic on interface"
+              description: " {{ $labels.device}} has high traffic  ({{ $value | humanize }}) Mb/s"
+        
+        
+          #High loading CPU
+          - alert: High loading CPU
+            expr: (1 - ((sum(rate(node_cpu_seconds_total {mode="idle"} [2m])) without (cpu)) / count(node_cpu_seconds_total) without (cpu)) > 0.9) or (1 - ((sum(rate(windows_cpu_time_total {mode="idle"} [2m])) without (core)) / count(windows_cpu_time_total) without (core)) > 0.9)
+            for: 30m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: "High loaging CPU"
+              description: "Loading CPU is too high ({{ $value | humanizePercentage }})"
+        
+        
+        
+          #Checikg access to website
+          - alert: Website does not response
+            expr: probe_http_status_code <= 199 or probe_http_status_code >= 400 or probe_http_status_code != 401
+            for: 1m
+            labels:
+              severity: critical
+              env: '{{ $labels.env }}'
+            annotations:
+              summary: Blackbox probe HTTP failure (instance {{ $labels.instance }})
+  
+              description: "HTTP status code is {{ $value }}"
+     
+     - name: Services status
+       rules:
+               
+               #Windows services
+               - alert: Windows service is down
+                 expr: |- 
+                     windows_service_state{state="running"} != 1
+                 for: 1m
+                 labels:
+                   severity: critical
+                   env: '{{ $labels.env }}'
+                 annotations:
+                   description: "Service {{ $labels.name }} is down"
+  
+
+               #Linux services
+               - alert: Linux service is down
+                 expr: node_systemd_unit_state != 1
+                 for: 1m
+                 labels:
+                   severity: critical
+                   env: '{{ $labels.env }}'
+                 annotations:
+                   description: "Service {{ $labels.name }} is down"{% endraw %}
+
+alertmanager_config: |
+  global:  
+   telegram_api_url: 'https://api.telegram.org'  
+   resolve_timeout: 10m  
+    
+  route:  
+   receiver: 'dev-channel'  
+   group_by: ['instance']  
+   group_wait: 30s  
+   group_interval: 5m  
+   repeat_interval: 20h
+   routes:  
+    - match:  
+        env: 'dev'
+      receiver: 'dev-channel'
+      group_by: ['instance']
+    - match:
+        env: 'prod'
+      routes:
+       - match:
+           alertname: SSLCertExpiringWarning
+         receiver: 'prod-warning'
+         group_by: ['instance']
+         repeat_interval: 24h
+         group_wait: 5m
+         group_interval: 6h
+       - match:
+           severity: 'warning'
+         receiver: 'prod-warning'
+         group_by: ['instance']
+       - match:
+           severity: 'critical'
+         receiver: 'prod-critical'
+         group_by: ['instance']
+  
+  receivers:
+  - name: 'dev-channel'
+    telegram_configs:
+    - bot_token: # your bot_token
+      api_url: https://api.telegram.org
+      chat_id: # your chat_id
+      message_thread_id: # your message_thread_id
+      send_resolved: true
+      parse_mode: HTML
+      message: '{%raw%}{{ template "telegram.dev" . }}{%endraw%}'
+  
+  - name: 'prod-warning'
+    telegram_configs:
+    - bot_token: # your bot_token
+      api_url: https://api.telegram.org
+      chat_id: # your chat_id
+      message_thread_id: # your message_thread_id
+      send_resolved: true
+      parse_mode: HTML
+      message: '{%raw%}{{ template "telegram.warning" . }}{%endraw%}'
+  
+  - name: 'prod-critical'
+    telegram_configs:
+    - bot_token: # your bot_token
+      api_url: https://api.telegram.org
+      chat_id: # your chat_id
+      message_thread_id: # your message_thread_id
+      send_resolved: true
+      parse_mode: HTML
+      message: '{%raw%}{{ template "telegram.critical" . }}{%endraw%}'
+  
+  templates:
+  - '/etc/alertmanager/*.tmpl'
+
+blackbox_config: |
+  modules:
+    http_2xx_json:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        method: GET
+        preferred_ip_protocol: "ip4"
+        fail_if_not_ssl: true
+        valid_status_codes: [200, 401]
+        headers:
+          Accept: application/json
+
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        preferred_ip_protocol: "ip4"
+        fail_if_ssl: false
+        fail_if_not_ssl: false
+        no_follow_redirects: false
+    
+    icmp:
+      prober: icmp
+      timeout: 5s
+      icmp:
+        preferred_ip_protocol: "ip4"
+    
+    tcp_connect:
+      prober: tcp
+      timeout: 5s
+  
+    ssl_cert:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        preferred_ip_protocol: "ip4"
+        fail_if_not_ssl: true
+  
+    dns_lookup:
+      prober: dns
+      dns:
+        transport_protocol: "udp"
+        preferred_ip_protocol: "ip4"
+        query_type: "A"
+        query_name: "example.com" #for __param_query_name in prometheus.yml -> job_name: 'blackbox_dns'
+
+dns_targets: |
+  - targets:
+    - 
+    labels:
+      query_name: 
+  - targets:
+    - 
+    labels:
+      query_name: 
+  - targets:
+    - 
+    labels:
+      query_name: 
+
+nginx_config: |
+  events {
+      worker_connections 1024;
+  }
+
+  http {
+  #    proxy_cache_path /var/cache/nginx keys_zone=auth_cache:3m;
+
+      server {
+          listen 0.0.0.0:0000 ssl;
+          server_name example.com;
+
+          ssl_certificate /etc/nginx/ssl/fullchain.pem;
+          ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+          location / {
+              auth_request /auth-proxy;
+              proxy_pass http://127.0.0.1:9090;
+          }
+
+          location = /auth-proxy {
+              internal;
+              proxy_pass http://127.0.0.1:8888;
+              proxy_pass_request_body off;
+              proxy_set_header Content-Length "";
+
+              proxy_set_header X-Ldap-URL "";
+              proxy_set_header X-Ldap-StarttLS "false";
+              proxy_set_header X-Ldap-BaseDN "";
+              proxy_set_header X-Ldap-BindDN "";
+              proxy_set_header X-Ldap-BindPass "{{ ldap_pass }}";
+              proxy_set_header X-Ldap-Template "(uid=%(username)s)";
+              proxy_set_header X-CookieName "nginxauth";
+              proxy_set_header Cookie nginxauth=$cookie_nginxauth;
+          }
+      }
+
+      server {
+          listen 0.0.0.0:0000 ssl;
+          server_name example.com;
+
+          ssl_certificate /etc/nginx/ssl/fullchain.pem;
+          ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+          location / {
+              auth_request /auth-proxy;
+              proxy_pass http://127.0.0.1:9093;
+          }
+
+          location = /auth-proxy {
+              internal;
+              proxy_pass http://127.0.0.1:8888;
+              proxy_pass_request_body off;
+              proxy_set_header Content-Length "";
+
+              proxy_set_header X-Ldap-URL "";
+              proxy_set_header X-Ldap-StarttLS "false"; 
+              proxy_set_header X-Ldap-BaseDN "";
+              proxy_set_header X-Ldap-BindDN "";
+              proxy_set_header X-Ldap-BindPass "{{ ldap_pass }}";
+              proxy_set_header X-Ldap-Template "(uid=%(username)s)";
+              proxy_set_header X-CookieName "nginxauth";
+              proxy_set_header Cookie nginxauth=$cookie_nginxauth;
+          }
+      }
+
+      server {
+          listen 443 ssl;
+          server_name example.com;
+
+          ssl_certificate /etc/nginx/ssl/fullchain.pem;
+          ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+          location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+          }
+
+          add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+          add_header X-Content-Type-Options nosniff;
+          add_header X-Frame-Options DENY;
+      }
+  }

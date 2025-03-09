@@ -1,0 +1,66 @@
+- hosts: is-ru1a-prometheus
+  roles:
+    - prometheus
+
+- hosts: is-ru1a-prometheus
+  roles:
+    - docker_run
+  vars:
+    run_docker_name: prometheus
+    run_docker_image: # your image
+    run_docker_ports: 127.0.0.1:9090:9090
+    run_docker_state: started
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_networks:
+      - name: # your name
+        ipv4_address: # your ip
+    run_docker_restart_policy: always
+    run_docker_volumes:
+      - /opt/ansible/prometheus/rules.yml:/etc/prometheus/rules.yml
+      - /opt/ansible/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /opt/ansible/prometheus/data:/prometheus:rw
+      - /opt/ansible/prometheus/dns_targets.yml:/etc/prometheus/dns_targets.yml
+      - /etc/hosts:/etc/hosts
+  tags:
+    - prometheus_container
+
+- hosts: is-ru1a-prometheus
+  roles:
+    - docker_run
+  vars:
+    run_docker_name: alertmanager
+    run_docker_image: # your image
+    run_docker_ports: 127.0.0.1:9093:9093
+    run_docker_state: started
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_networks:
+      - name: # your name
+        ipv4_address: # your ip
+    run_docker_restart_policy: always
+    run_docker_volumes:
+      - /opt/ansible/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - /opt/ansible/alertmanager/telegram.tmpl:/etc/alertmanager/telegram.tmpl
+    run_docker_command: "--config.file=/etc/alertmanager/alertmanager.yml --web.external-url=https://""example.com"":9093"
+  tags:
+  - alertmanager_container
+
+- hosts: is-ru1a-prometheus
+  roles:
+    - docker_run
+  vars:
+    run_docker_name: blackbox
+    run_docker_image: # your image
+    run_docker_ports: 127.0.0.1:9115:9115
+    run_docker_state: started
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_networks:
+      - name: # your name
+        ipv4_address: # your ip
+    run_docker_restart_policy: always
+    run_docker_volumes:
+      - /opt/ansible/blackbox_exporter/blackbox.yml:/etc/blackbox/blackbox.yml
+    run_docker_command: "--config.file=/etc/blackbox/blackbox.yml"
+    run_docker_capabilities:
+      - CAP_NET_RAW
+  tags:
+  - blackbox_container

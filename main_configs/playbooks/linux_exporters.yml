@@ -1,0 +1,51 @@
+- hosts: linux
+  become: true
+  tasks:
+    - name: Run node_exporter
+      import_role:
+        name: linux_exporters
+      vars:
+        exporter_name: "node_exporter"
+        exporter_image: # your image
+        exporter_port: "9100"
+        exporter_mounts:
+          - "/:/host:ro,rslave"
+          - "/var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket"
+          - "/var/lib/{{ exporter_name }}/logs:/var/lib/{{ exporter_name }}/logs"
+        exporter_pid_mode: "host"
+        exporter_privileged: true
+        exporter_container_cmd:
+          - --path.procfs=/host/proc
+          - --path.sysfs=/host/sys
+        exporter_cmd:
+          - --web.listen-address=:9100
+          - --web.telemetry-path=/metrics
+          - --collector.systemd
+          - --collector.diskstats
+        exporter_version: "1.9.0"
+        exporter_use_container: true
+        exporter_rootfull: true
+        exporter_install: true
+      when: "'node_exporter' in ansible_run_tags"
+      tags:
+        - node_exporter
+
+    - name: Run container_exporter
+      import_role:
+        name: linux_exporters
+      vars:
+        exporter_name: "container_exporter"
+        exporter_image: "ghcr.io/davidborzek/docker-exporter:v0.3.0"
+        exporter_internal_user: root
+        exporter_port: "{{ ansible_host }}:9104:8080"
+        exporter_pid_mode: "host"
+        exporter_mounts:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+        exporter_mounts_rootless:
+          - "{{ lookup('env', 'XDG_RUNTIME_DIR') }}/docker.sock:/var/run/docker.sock"
+        exporter_use_container: true
+        exporter_rootfull: true
+        exporter_install: true
+      when: "'container_exporter' in ansible_run_tags"
+      tags:
+        - container_exporter

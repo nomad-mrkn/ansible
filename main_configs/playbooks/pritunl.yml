@@ -4,7 +4,7 @@
     - docker-run
   vars:
     run_docker_name: pritunl
-    run_docker_image: harbor.playful-fairies.com/sysadmin/pritunl:1.32.3660.72-focal
+    run_docker_image: # your image
     run_docker_ports: "{{ pritunl_ports }}"
     run_docker_state: started
     run_docker_restart_policy: always
@@ -19,7 +19,7 @@
     run_docker_env:
       MONGO_USER: "{{ var_mongo_user }}"
       MONGO_PASS: "{{ mongo_pass }}"
-      PRITUNL_MONGODB_URI: "mongodb://mongoadmin:bg6ZTsY0t9Kq@5.182.36.254:27017/pritunl?authSource=admin"
+      PRITUNL_MONGODB_URI: "mongodb://mongoadmin:<< your_pass >>@<< your_ip >>:27017/pritunl?authSource=admin"
 
   pre_tasks:
     - name: Create docker network

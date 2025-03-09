@@ -1,0 +1,53 @@
+### To run this full playbook:
+### ansible-playbook playbooks/fast_start.yml -l <inventory_hostname> --tags docker_rootfull,install_exporter,node_exporter
+### OR
+### ansible-playbook playbooks/fast_start.yml -l <inventory_hostname> --tags docker_rootless,install_exporter,node_exporter
+
+- hosts: linux
+  become: true
+  vars:
+    ansible_user: root
+  tasks:
+    - name: Run provisioning and SSH keys setup
+      import_role:
+        name: linux_setup
+      tags: always
+
+    - name: Configure SSH keys
+      import_role:
+        name: ssh_setting
+      tags: always
+
+- hosts: linux
+  become: true
+  tasks:
+    - name: Install Docker
+      import_role:
+        name: docker_install
+
+    - name: Run exporter
+      import_role:
+        name: linux_exporters
+      vars:
+        exporter_name: "node_exporter"
+        exporter_image: # your image
+        exporter_version: # your version
+        exporter_port: "9100"
+        exporter_mounts:
+          - "/:/host:ro,rslave"
+          - "/var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket"
+        exporter_pid_mode: "host"
+        exporter_privileged: true
+        exporter_container_cmd:
+          - --path.procfs=/host/proc
+          - --path.sysfs=/host/sys
+        exporter_cmd:
+          - --web.listen-address=:9100
+          - --web.telemetry-path=/metrics
+          - --collector.systemd
+          - --collector.diskstats
+        exporter_use_container: true
+        exporter_rootfull: true
+        exporter_install: true
+      tags: node_exporter
+

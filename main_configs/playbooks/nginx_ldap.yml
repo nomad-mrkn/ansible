@@ -1,0 +1,15 @@
+- hosts: linux
+  become: true
+  roles:
+    - nginx_ldap
+  vars:
+    run_docker_name: nginx-proxy
+    run_docker_image: nginx:1.24.0
+    run_docker_state: started
+    run_docker_memory: "{{ ansible_memtotal_mb * 0.75 }}m"
+    run_docker_network_mode: host
+    run_docker_volumes:
+      - /opt/ansible/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/ansible/nginx/ssl:/etc/nginx/ssl:ro
+      - /var/cache/nginx:/var/cache/nginx
+    run_docker_restart_policy: "always"

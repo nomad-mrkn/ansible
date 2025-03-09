@@ -1,0 +1,9 @@
+roles:
+  - src: your repo
+    scm: git
+    version: master
+
+collections:
+  - name: community.general
+    version: 9.4.0
+

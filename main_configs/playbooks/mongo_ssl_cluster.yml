@@ -4,7 +4,7 @@
     - mongodb
   vars:
     run_docker_name: mongo
-    run_docker_image: harbor.playful-fairies.com/sysadmin/mongo:5.0.21-rc0-focal
+    run_docker_image: # your image
     run_docker_ports:
       - "{{ mongo_port }}:{{ mongo_port }}"
     run_docker_state: started

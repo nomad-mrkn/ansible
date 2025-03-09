@@ -1,0 +1,9 @@
+/.idea
+roles/*
+/.vs
+!roles/requirements.yml
+key
+key.pub
+vault-pass
+scripts
+.vscode
