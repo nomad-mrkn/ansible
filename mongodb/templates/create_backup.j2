@@ -16,7 +16,7 @@ then
   current_date=$(date +%d-%m-%Y)
   tar -czvf "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" admin pritunl
   ln -sf "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" "mongodump_latest.tar.gz"
-  curl -T "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" ftp://141.95.47.157/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
-  curl -T "mongodump_latest.tar.gz" ftp://141.95.47.157/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
+  curl -T "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz" ftp://<your ftp addr>/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
+  curl -T "mongodump_latest.tar.gz" ftp://<your ftp addr>/mongodb/ --user {{ ftp_user }}:{{ ftp_pass_script }}
   rm -r admin pritunl "mongodump_{{ inventory_hostname }}_${current_date}.tar.gz"
 fi

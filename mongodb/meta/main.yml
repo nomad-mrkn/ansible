@@ -1,7 +1,7 @@
 galaxy_info:
-  author: Panoramik
+  author: nomad_mrkn
   description: mongodb role
-  company: Panoramik
+  company: []
   license: MIT
   min_ansible_version: 2.4
   galaxy_tags: []
