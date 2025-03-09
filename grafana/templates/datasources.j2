@@ -1,0 +1,16 @@
+#{{ ansible_managed }}
+
+apiVersion: 1
+datasources:
+  - name: # your datasourse name
+    type: # your datasourse type
+    access: proxy
+    url: {{ database_url }}
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "30s"
+      httpMethod: POST
+      manageAlerts: true
+    version: 1
+    editable: true

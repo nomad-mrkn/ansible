@@ -1,0 +1,21 @@
+#{{ ansible_managed }}
+
+[[servers]]
+host = "# your ldap host url"
+port = # your ldap host port
+use_ssl = true
+start_tls = false
+ssl_skip_verify = false
+bind_dn = "# your ldap bind_dn"
+bind_password = "{{ ldap_pass }}"
+search_filter = "(uid=%s)"
+search_base_dns = ["# your search_base_dns"]
+
+[servers.attributes]
+username = "uid"
+member_of = "memberOf"
+
+[[servers.group_mappings]]
+group_dn = "# your group_dn"
+org_role = "Admin"
+org_id = 1

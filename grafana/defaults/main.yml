@@ -1,0 +1,8 @@
+grafana_dir: /opt/ansible/grafana
+dashboards_dir: /opt/ansible/grafana/provisioning/dashboards
+configs_dir: /var/lib/grafana
+database_url: # your database URL
+instance_name: # your instance name
+grafana_domain: # your grafana domain
+grafana_admin_user: # your grafana admin user
+grafana_admin_password: # your grafana admin pass

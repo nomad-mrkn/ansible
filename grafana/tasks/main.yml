@@ -1,0 +1,55 @@
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ ansible_dir }}", owner: "root", group: "root", mode: "755" }
+    - { path: "{{ ansible_dir }}/grafana", owner: "root", group: "root", mode: "755" }
+    - { path: "{{ grafana_dir }}/ssl", owner: "root", group: "root", mode: "755" }
+    - { path: "{{ grafana_dir }}/logs", owner: "472", group: "root", mode: "755" }
+    - { path: "{{ grafana_dir }}/provisioning/dashboards", owner: "472", group: "root", mode: "755" }
+    - { path: "{{ grafana_dir }}/provisioning/datasources", owner: "472", group: "root", mode: "755" }
+
+- name: Create configs
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "templates/grafana.ini.j2", dest: "{{ grafana_dir }}/grafana.ini", owner: "472", group: "root", mode: "644" }
+    - { src: "templates/datasources.j2", dest: "{{ grafana_dir }}/provisioning/datasources/datasources.yaml", owner: "472", group: "root", mode: "644" }
+    - { src: "templates/dashboards.j2", dest: "{{ grafana_dir }}/provisioning/dashboards/dashboards.yaml", owner: "472", group: "root", mode: "644" }
+    - { src: "templates/ldap.toml.j2", dest: "{{ grafana_dir }}/ldap.toml", owner: "472", group: "root", mode: "644" }
+    - { src: "templates/fullchain.j2", dest: "{{ grafana_dir }}/ssl/fullchain.pem", owner:  "root", group: "root", mode: "644" }
+    - { src: "templates/privkey.j2", dest: "{{ grafana_dir }}/ssl/privkey.pem", owner: "root", group: "root", mode: "644" }
+  register: config_status
+
+- name: Copy template
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "files/main_dashboard.json", dest: "{{ dashboards_dir }}/main_dashboard.json", owner: "472", group: "root", mode: "644" }
+    - { src: "files/blackbox_dashboard.json", dest: "{{ dashboards_dir }}/blackbox_dashboard.json", owner: "472", group: "root", mode: "644" }
+    - { src: "files/linux_dashboard.json", dest: "{{ dashboards_dir }}/linux_dashboard.json", owner: "472", group: "root", mode: "644" }
+    - { src: "files/win_dashboard.json", dest: "{{ dashboards_dir }}/win_dashboard.json", owner: "472", group: "root", mode: "644" }
+  register: dashboard_status
+
+- name: run grafana container
+  include_role:
+    name: docker_run
+
+- name: Restart grafana container if configuration changed
+  docker_container:
+    name: "{{ run_docker_name }}"
+    state: started
+    recreate: yes
+  when: config_status.changed or dashboard_status.changed

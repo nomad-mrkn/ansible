@@ -1,0 +1,80 @@
+#{{ ansible_managed }}
+
+app_mode = production
+instance_name = {{ instance_name }}
+
+[paths]
+data = {{ configs_dir }}/data
+logs = {{ configs_dir }}/data/logs
+plugins = {{ configs_dir }}/data/plugins
+provisioning = /etc/grafana/provisioning
+
+[auth.ldap]
+enabled = true
+allow_sign_up = true
+config_file = /etc/grafana/ldap.toml
+
+[server]
+protocol = http
+http_addr = 0.0.0.0 # or your addr
+http_port = 3000 # or your port
+domain = {{ grafana_domain }}
+cert_file = /etc/grafana/ssl/fullchain.pem
+cert_key = /etc/grafana/ssl/privkey.pem
+serve_from_sub_path = false
+static_root_path = public
+enable_gzip = true
+read_timeout = 30s
+
+[session]
+provider = file
+
+[database]
+type = sqlite3
+path = grafana.db
+
+[security]
+content_security_policy = true
+login_remember_days = 28
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+#disable_gravatar = true
+#cookie_username = grafana_user
+#cookie_remember_name = grafana_remember
+
+[dashboards]
+versions_to_keep = 20
+min_refresh_interval = 10s
+
+[log]
+log_rotate = true
+max_days = 7
+level = debug
+mode = console file
+level = debug
+filters = ldap:debug
+
+[metrics]
+enabled = true
+interval_seconds = 15
+
+[auth]
+disable_login_form = false
+oauth_auto_login = false
+
+[auth.anonymous]
+enabled = false
+
+[explore]
+enabled = true
+
+[users]
+default_theme = dark
+viewers_can_edit = false
+
+[quota]
+enabled = true
+org_user = 10
+org_dashboard = 100
+org_data_source = 10
+org_api_key = 10
