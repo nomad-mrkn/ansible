@@ -6,4 +6,4 @@
 
 Теги для перезапуска контейнера: `prometheus_container`, `blackbox_container`, `alertmanager_container`
 
-Все конфиги-переменные находятся в `/main_role/environments/all/host_vars/prometheus.yml`
+Все конфиги-переменные находятся в `/main_config/environments/all/host_vars/prometheus.yml`
