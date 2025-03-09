@@ -1,0 +1,7 @@
+galaxy_info:
+  author: nomad_mrkn
+  description: Install nginx with ldap module
+  company: []
+  license: MIT
+  min_ansible_version: 2.9
+  galaxy_tags: []

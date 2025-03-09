@@ -1,0 +1,64 @@
+- name: Update and install required packages
+  apt:
+    update_cache: yes
+    name:
+      - python3
+      - python3-pip
+      - python3-ldap
+      - docker-buildx-plugin
+    state: present
+
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+      - { path: "{{ ansible_dir }}", owner: "root", group: "root", mode: "755" }
+      - { path: "{{ nginx_configs_dir }}", owner: "root", group: "root", mode: "755" }
+      - { path: "{{ nginx_configs_dir }}/ssl", owner: "root", group: "root", mode: "755" }
+
+- name: Copy needed files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "templates/Dockerfile.j2", dest: "{{ nginx_configs_dir }}/Dockerfile", owner:  "root", group: "root", mode: "755" }
+    - { src: "templates/nginx-ldap-auth-daemon.j2", dest: "{{ nginx_configs_dir }}/nginx-ldap-auth-daemon.py", owner:  "root", group: "root", mode: "644" }
+    - { src: "templates/nginx.j2", dest: "{{ nginx_configs_dir }}/nginx.conf", owner: "root", group: "root", mode: "644" }
+    - { src: "templates/fullchain.j2", dest: "{{ nginx_configs_dir }}/ssl/fullchain.pem", owner:  "root", group: "root", mode: "644" }
+    - { src: "templates/privkey.j2", dest: "{{ nginx_configs_dir }}/ssl/privkey.pem", owner: "root", group: "root", mode: "644" }
+  register: config_status
+
+- name: Build LDAP auth daemon container
+  docker_image:
+    name: "{{ ldap_module_image }}"
+    source: build
+    build:
+      path: "{{ nginx_configs_dir }}"
+      args:
+        PYTHON_VERSION: 3
+    state: present
+
+- name: Run LDAP auth daemon container
+  docker_container:
+    name: "{{ ldap_module_name }}"
+    image: "{{ ldap_module_image }}"
+    ports: "{{ ldap_module_ports }}"
+    network_mode: bridge
+    restart_policy: always
+
+- name: run nginx-proxy container
+  include_role:
+    name: docker_run
+
+- name: Restart nginx-proxy container if configuration changed
+  docker_container:
+    name: nginx-proxy
+    state: started
+  when: config_status.changed

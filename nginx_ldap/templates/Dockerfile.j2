@@ -1,0 +1,18 @@
+#{{ ansible_managed }}
+
+ARG PYTHON_VERSION=3
+FROM python:${PYTHON_VERSION}-slim
+
+RUN apt-get update && \
+    apt-get install -y libldap2-dev libsasl2-dev gcc && \
+    pip install python-ldap && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY nginx-ldap-auth-daemon.py /opt/ansible/nginx/
+
+WORKDIR /opt/ansible/nginx
+
+EXPOSE 8888
+
+CMD ["python", "/opt/ansible/nginx/nginx-ldap-auth-daemon.py", "--host", "127.0.0.1", "--port", "8888"]

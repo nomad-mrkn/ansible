@@ -1,0 +1,4 @@
+nginx_configs_dir: /opt/ansible/nginx
+ldap_module_name: ldap-auth
+ldap_module_image: nginx-ldap-auth-daemon
+ldap_module_ports: 127.0.0.1:8888:8888
