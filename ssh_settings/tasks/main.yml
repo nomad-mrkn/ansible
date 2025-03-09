@@ -1,0 +1,23 @@
+- name: Set authorized_keys for user
+  authorized_key:
+    user: "{{ user_name }}"
+    key: "{{ lookup('file', 'files/authorized_keys') }}"
+    exclusive: true
+    state: present
+
+- name: Set authorized_keys for root
+  authorized_key:
+    user: root
+    key: "{{ lookup('file', 'files/root/authorized_keys') }}"
+    exclusive: true
+    state: present
+
+- name: Configure ssh
+  ansible.builtin.template:
+    src: "sshd_config.j2"
+    dest: "/etc/ssh/sshd_config"
+    owner: root
+    group: root
+    mode: '0644'
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart ssh
