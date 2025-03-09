@@ -19,7 +19,7 @@ iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -p udp --dport 53 -j ACCEPT
 iptables -A INPUT -p tcp --dport 53 -j ACCEPT
 iptables -A INPUT -s 127.0.0.1 -p tcp -j ACCEPT
-{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ipt_exporter, ipt_ipsec, ipt_site, ipt_mongo, ipt_pritunl, ipt_proxy, ipt_pm, ipt_nginx, ipt_mail, ipt_pm_vm, ipt_nginx_exporter, ipt_perforce, ipt_mongo_exporter, ipt_ipsec_exporter, ipt_vnc1, ipt_vnc2) -%}
+{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ...) -%}
 {%- if setrule is defined and setrule.docker is defined and setrule.source_address is defined and setrule.protocol is defined and setrule.destination_port is defined %}
 {%- if setrule.docker | default(False) == False %}
 iptables -A INPUT
@@ -45,7 +45,7 @@ if [ "$docker_running" = true ]; then
 iptables -F DOCKER-USER
 iptables -A DOCKER-USER -i docker0 -j RETURN
 iptables -A DOCKER-USER -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ipt_exporter, ipt_site, ipt_ipsec, ipt_mongo, ipt_pritunl, ipt_proxy, ipt_pm, ipt_nginx, ipt_mail, ipt_pm_vm, ipt_nginx_exporter, ipt_perforce, ipt_mongo_exporter, ipt_ipsec_exporter, ipt_vnc1, ipt_vnc2) -%}
+{% for setrule in (ipt_icmp, ipt_ssh, ipt_node_exporter, ...) -%}
 {%- if setrule is defined and setrule.docker is defined and setrule.source_address is defined and setrule.protocol is defined and setrule.destination_port is defined %}
 {%- if setrule.docker | default(False) == True %}
 iptables -A DOCKER-USER

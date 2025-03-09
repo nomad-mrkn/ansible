@@ -1,7 +1,7 @@
 galaxy_info:
-  author: Panoramik
+  author: nomad_mrkn
   description: Config iptables
-  company: Panoramik
+  company: []
   license: MIT
   min_ansible_version: 2.9
   galaxy_tags: []

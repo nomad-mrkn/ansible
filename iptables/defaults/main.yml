@@ -5,7 +5,7 @@ ipt_ssh:
   destination_port: 22
   protocol: tcp
   source_address:
-    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+    "{% for host in groups[ 'groups_name' ] | union(groups['groups_name']) %}\
    {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
    {% endfor %}"
 ipt_icmp:
@@ -13,7 +13,7 @@ ipt_icmp:
   destination_port: --icmp-type any
   protocol: icmp
   source_address:
-    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+    "{% for host in groups[ 'groups_name' ] | union(groups['groups_name']) %}\
    {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
    {% endfor %}"
 ipt_node_exporter:
@@ -21,6 +21,6 @@ ipt_node_exporter:
   destination_port: 9100
   protocol: tcp
   source_address:
-    "{% for host in groups[ 'offices' ] | union(groups['pritunl']) %}\
+    "{% for host in groups[ 'groups_name' ] | union(groups['groups_name']) %}\
    {{ hostvars[host][ 'ansible_host' ] }}{% if not loop.last %},{% endif %}\
    {% endfor %}"
